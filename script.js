@@ -1,5 +1,15 @@
-// Replace with your actual Spoonacular API key
-const API_KEY = 'your_api_key_here';
+// API Configuration - Choose your preferred API
+const API_CONFIG = {
+    // Spoonacular (Global recipes)
+    spoonacular: {
+        key: '5284896007b2407f8a43678f3758a30c',
+        url: 'https://api.spoonacular.com/recipes/findByIngredients',
+        params: 'number=10&ranking=2&cuisine=Indian' // Added Indian cuisine filter
+    },
+};
+
+// Use Spoonacular by default (you already have the API key)
+const CURRENT_API = 'spoonacular';
 
 // DOM elements
 const ingredientsInput = document.getElementById('ingredients');
@@ -23,19 +33,70 @@ async function fetchRecipes(ingredients) {
     showLoading();
     hideError();
     resultsDiv.innerHTML = '';
+
     try {
-        const response = await fetch(`https://api.spoonacular.com/recipes/findByIngredients?apiKey=${API_KEY}&ingredients=${encodeURIComponent(ingredients)}&number=10&ranking=2`);
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
+        let recipes = [];
+
+        if (CURRENT_API === 'spoonacular') {
+            recipes = await fetchFromSpoonacular(ingredients);
+        } else if (CURRENT_API === 'edamam') {
+            recipes = await fetchFromEdamam(ingredients);
         }
-        const data = await response.json();
-        displayRecipes(data);
+
+        displayRecipes(recipes);
     } catch (error) {
         console.error(error);
-        showError('Failed to fetch recipes. Please check your API key and try again.');
+        showError('Failed to fetch recipes. Please check your API keys and try again.');
     } finally {
         hideLoading();
     }
+}
+
+// Spoonacular API implementation
+async function fetchFromSpoonacular(ingredients) {
+    const config = API_CONFIG.spoonacular;
+    // Enhanced parameters for better Indian recipe results
+    const enhancedParams = `${config.params}&sort=max-used-ingredients&instructionsRequired=true&addRecipeInformation=true`;
+    const response = await fetch(
+        `${config.url}?apiKey=${config.key}&ingredients=${encodeURIComponent(ingredients)}&${enhancedParams}`
+    );
+
+    if (!response.ok) {
+        throw new Error(`Spoonacular API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.map(recipe => ({
+        id: recipe.id,
+        title: recipe.title,
+        image: recipe.image,
+        usedIngredients: recipe.usedIngredients,
+        url: `https://spoonacular.com/recipes/-${recipe.id}`
+    }));
+}
+
+// Edamam API implementation (Indian-focused alternative)
+async function fetchFromEdamam(ingredients) {
+    const config = API_CONFIG.edamam;
+    // Edamam works better with specific ingredient searches
+    const ingredientList = ingredients.split(',').map(ing => ing.trim()).slice(0, 3); // Limit to 3 ingredients
+
+    const response = await fetch(
+        `${config.url}?type=public&app_id=${config.appId}&app_key=${config.appKey}&q=${encodeURIComponent(ingredientList.join(' '))}&cuisineType=Indian`
+    );
+
+    if (!response.ok) {
+        throw new Error(`Edamam API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.hits.map(hit => ({
+        id: hit.recipe.uri.split('_')[1],
+        title: hit.recipe.label,
+        image: hit.recipe.image,
+        usedIngredients: hit.recipe.ingredientLines.slice(0, 3), // Show first 3 ingredients
+        url: hit.recipe.url
+    }));
 }
 
 // Display recipes
