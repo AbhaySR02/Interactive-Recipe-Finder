@@ -18,6 +18,31 @@ const resultsDiv = document.getElementById('results');
 const loadingDiv = document.getElementById('loading');
 const errorDiv = document.getElementById('error');
 
+// Create modal on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.createElement('div');
+    modal.id = 'recipe-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeRecipeModal()">&times;</span>
+            <h2 id="modal-title"></h2>
+            <div class="modal-body">
+                <p>Click the button below to view the full recipe:</p>
+                <a id="modal-link" target="_blank" rel="noopener noreferrer">View Full Recipe</a>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Close modal when clicking outside
+    modal.onclick = function(event) {
+        if (event.target === modal) {
+            closeRecipeModal();
+        }
+    };
+});
+
 // Event listener
 searchBtn.addEventListener('click', () => {
     const ingredients = ingredientsInput.value.trim();
@@ -108,16 +133,66 @@ function displayRecipes(recipes) {
     recipes.forEach(recipe => {
         const card = document.createElement('div');
         card.className = 'recipe-card';
-        const usedIngredients = recipe.usedIngredients.map(ing => ing.name).join(', ');
+
+        // Handle ingredients display
+        let usedIngredients = '';
+        if (recipe.usedIngredients && recipe.usedIngredients.length > 0) {
+            if (Array.isArray(recipe.usedIngredients)) {
+                usedIngredients = recipe.usedIngredients.map(ing => ing.name || ing).join(', ');
+            } else {
+                usedIngredients = recipe.usedIngredients;
+            }
+        }
+
+        // Clean recipe title
+        const cleanTitle = recipe.title.replace(/[^\w\s\-.,&()]/g, '');
+
+        // Use higher quality Spoonacular images with better fallbacks
+        const highQualityImage = recipe.image ? recipe.image.replace('312x231', '636x393') : null;
+
+        // Better fallback images for Indian cuisine
+        const fallbackImages = [
+            'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&h=250&fit=crop&crop=center&auto=format&q=80', // Dal
+            'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=250&fit=crop&crop=center&auto=format&q=80', // Indian food
+            'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?w=400&h=250&fit=crop&crop=center&auto=format&q=80', // Curry
+            'https://images.unsplash.com/photo-1563379091339-03246963d96c?w=400&h=250&fit=crop&crop=center&auto=format&q=80'  // Biryani
+        ];
+        const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+
         card.innerHTML = `
-            <img src="${recipe.image}" alt="${recipe.title}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
-            <h3>${recipe.title}</h3>
-            <p>Used ingredients: ${usedIngredients}</p>
-            <a href="https://spoonacular.com/recipes/-${recipe.id}" target="_blank">View Recipe</a>
+            <img src="${highQualityImage || randomFallback}" alt="${cleanTitle}" onerror="this.onerror=null; this.src='${randomFallback}'; this.alt='Delicious Indian food';">
+            <h3>${cleanTitle}</h3>
+            <p><strong>Ingredients:</strong> ${usedIngredients || 'See full recipe for details'}</p>
+            <button class="view-recipe-btn" onclick="openRecipeModal('${recipe.id}', '${cleanTitle.replace(/'/g, "\\'")}', '${recipe.url}')">View Recipe</button>
         `;
         resultsDiv.appendChild(card);
     });
 }
+
+// Open recipe in modal instead of redirecting
+function openRecipeModal(id, title, url) {
+    const modal = document.getElementById('recipe-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalLink = document.getElementById('modal-link');
+
+    if (modal && modalTitle && modalLink) {
+        modalTitle.textContent = title;
+        modalLink.href = url;
+        modalLink.textContent = `View ${title} Recipe`;
+        modal.style.display = 'block';
+    } else {
+        console.error('Modal elements not found');
+    }
+}
+
+// Close recipe modal
+function closeRecipeModal() {
+    const modal = document.getElementById('recipe-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
 
 // Utility functions
 function showLoading() {
